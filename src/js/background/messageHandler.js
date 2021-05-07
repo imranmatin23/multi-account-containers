@@ -4,6 +4,10 @@ const messageHandler = {
   // If this were in platform we would change how the tab opens based on "new tab" link navigations such as ctrl+click
   LAST_CREATED_TAB_TIMER: 2000,
 
+  /**
+   * Creates an onMessage listener that doesn't actually run until it recieves a message. Then it
+   * parses the message for the method to do, and then calls that method.
+   */
   init() {
     // Handles messages from webextension code
     browser.runtime.onMessage.addListener(async (m) => {
@@ -147,6 +151,11 @@ const messageHandler = {
       }
     });
 
+    /**
+     * MAYBE: What is a browser.contextualIdentity? A user can have multiple different ids
+     * when the browsing the web, when the user removes one of those ids, it removes 
+     * the context for that user and deletes the container associated with that identity.
+     */
     if (browser.contextualIdentities.onRemoved) {
       browser.contextualIdentities.onRemoved.addListener(({contextualIdentity}) => {
         const userContextId = backgroundLogic.getUserContextIdFromCookieStoreId(contextualIdentity.cookieStoreId);
@@ -154,6 +163,10 @@ const messageHandler = {
       });
     }
 
+    /**
+     * When this tab gets activated, perform some actions on the ContextMenu.
+     * TODO: Refer to assignManager.js for the actually actions performed on the ContextMenu.
+     */
     browser.tabs.onActivated.addListener((info) => {
       assignManager.removeContextMenu();
       browser.tabs.get(info.tabId).then((tab) => {
@@ -163,10 +176,18 @@ const messageHandler = {
       });
     });
 
+    /**
+     * On every onFocusChange (meaning if you click on another screen, minimize your window, etc.)
+     * it will call the onFocusChangedCallback() method written below.
+     */
     browser.windows.onFocusChanged.addListener((windowId) => {
       this.onFocusChangedCallback(windowId);
     });
 
+    /**
+     * On every webRequest that completes, it performs some actions on the ContextMenu.
+     * TODO: Refer to assignManager.js for the actually actions performed on the ContextMenu.
+     */
     browser.webRequest.onCompleted.addListener((details) => {
       if (details.frameId !== 0 || details.tabId === -1) {
         return {};
@@ -180,6 +201,10 @@ const messageHandler = {
       });
     }, {urls: ["<all_urls>"], types: ["main_frame"]});
 
+
+    /**
+     * This code block runs whenever you open a new tab.
+     */
     browser.tabs.onCreated.addListener((tab) => {
       // lets remember the last tab created so we can close it if it looks like a redirect
       this.lastCreatedTab = tab;
@@ -217,6 +242,9 @@ const messageHandler = {
     });
   },
 
+  /**
+   * Increments the number of ContainerTabs open.
+   */
   async incrementCountOfContainerTabsOpened() {
     const key = "containerTabsOpened";
     const count = await browser.storage.local.get({[key]: 0});
@@ -235,6 +263,10 @@ const messageHandler = {
     }
   },
 
+  /**
+   * Related to the onFocusChanged listener, and performs actions on the ContextMenu.
+   * TODO: Refer to assignManager.js for the actually actions performed on the ContextMenu.
+   */
   async onFocusChangedCallback(windowId) {
     assignManager.removeContextMenu();
     // browserAction loses background color in new windows ...

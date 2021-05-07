@@ -1,3 +1,8 @@
+/**
+ * Description: This page runs everytime any url is accessed. However, 
+ * 
+ */
+
 async function delayAnimation(delay = 350) {
   return new Promise((resolve) => {
     setTimeout(resolve, delay);
@@ -41,6 +46,8 @@ async function addMessage(message) {
   divElement.remove();
 }
 
+// browser.runtime.onMessage is used to listen for messages from other parts of the extension
+// Example: A content script can listen for messages from a background script using browswer.runtime.onMessage
 browser.runtime.onMessage.addListener((message) => {
   addMessage(message);
 });
