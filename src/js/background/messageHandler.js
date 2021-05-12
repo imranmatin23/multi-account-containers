@@ -114,6 +114,10 @@ const messageHandler = {
       return response;
     });
 
+
+    /**
+     * HELP: Not sure what this is for. What is the reason for externel extensions?
+     */
     // Handles external messages from webextensions
     const externalExtensionAllowed = {};
     browser.runtime.onMessageExternal.addListener(async (message, sender) => {
@@ -150,6 +154,9 @@ const messageHandler = {
         delete externalExtensionAllowed[extensionInfo.id];
       }
     });
+    /**
+     * HELP: Not sure what this^ is for. What is the reason for externel extensions?
+     */
 
     /**
      * MAYBE: What is a browser.contextualIdentity? A user can have multiple different ids

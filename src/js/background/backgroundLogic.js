@@ -8,6 +8,15 @@ const backgroundLogic = {
   ]),
   NUMBER_OF_KEYBOARD_SHORTCUTS: 10,
   unhideQueue: [],
+
+  /**
+   * Gets the cookieStoreId for a tab and creates a new tab using that cookie in the
+   * same contextualIdentity (container). An example is when a user is browsing in
+   * the "Personal" container and wants to open a new tab in the "Personal" container.
+   * In this case the user should still have all the same "Personal" cookies.
+   * 
+   * A cookieStoreId is the way of identifiying a tab's cookie store.
+   */
   init() {
     browser.commands.onCommand.addListener(function (command) {
       for (let i=0; i < backgroundLogic.NUMBER_OF_KEYBOARD_SHORTCUTS; i++) {
@@ -21,6 +30,9 @@ const backgroundLogic = {
     });
   },
 
+  /**
+   * Gets the information about the extension from the manifest.json file.
+   */
   async getExtensionInfo() {
     const manifestPath = browser.extension.getURL("manifest.json");
     const response = await fetch(manifestPath);
@@ -28,6 +40,11 @@ const backgroundLogic = {
     return extensionInfo;
   },
 
+  /**
+   * Take in a cookieStoreId which represents a container, and gets the continer name
+   * from the cookieStoreId.
+   * "firefox-container-CONTAINER_NAME" --> "CONTAINER_NAME"
+   */
   getUserContextIdFromCookieStoreId(cookieStoreId) {
     if (!cookieStoreId) {
       return false;
@@ -39,6 +56,12 @@ const backgroundLogic = {
     return false;
   },
 
+  /**
+   * Deletes a container by first closing all the tabs related to this container.
+   * Then deregister this container with the browser so that it is no longer recognized.
+   * Once the container is removed, do not open websites that were assigned to that
+   * container in a container anymore.
+   */
   async deleteContainer(userContextId, removed = false) {
     await this._closeTabs(userContextId);
     if (!removed) {
@@ -48,6 +71,11 @@ const backgroundLogic = {
     return {done: true, userContextId};
   },
 
+  /**
+   * If the container is not new, update the container with new parameters about
+   * the container. Else, if it is new then create a new container with the new
+   * parameters.
+   */
   async createOrUpdateContainer(options) {
     let donePromise;
     if (options.userContextId !== "new") {
@@ -61,6 +89,12 @@ const backgroundLogic = {
     await donePromise;
   },
 
+  /**
+   * Open a new tab in the correct container, check whether to switch to the new
+   * tab or not, and check whether to load the content immmediately or when the
+   * tab is opened (lazy load). Open the new tab at the url passed unless the user
+   * is trying to open a page that is not available.
+   */
   async openNewTab(options) {
     let url = options.url || undefined;
     const userContextId = ("userContextId" in options) ? options.userContextId : 0;
@@ -88,6 +122,12 @@ const backgroundLogic = {
     });
   },
 
+  /**
+   * Error check the url that they are trying to open.
+   * 
+   * NOTE: Is the fact that "chrome:" is disallowed causing issues with Google
+   * pages?
+   */
   isPermissibleURL(url) {
     const protocol = new URL(url).protocol;
     // We can't open these we just have to throw them away
@@ -99,6 +139,10 @@ const backgroundLogic = {
     return true;
   },
 
+  /**
+   * Error checking that the method passed in will be called with the correct
+   * parameters.
+   */
   checkArgs(requiredArguments, options, methodName) {
     requiredArguments.forEach((argument) => {
       if (!(argument in options)) {
@@ -107,6 +151,10 @@ const backgroundLogic = {
     });
   },
 
+  /**
+   * Get the open tabs that are for the specified container. It also gets any
+   * hidden tabs for this container as well.
+   */
   async getTabs(options) {
     const requiredArguments = ["cookieStoreId", "windowId"];
     this.checkArgs(requiredArguments, options, "getTabs");
@@ -125,6 +173,9 @@ const backgroundLogic = {
     return list.concat(containerState.hiddenTabs);
   },
 
+  /**
+   * Hides any tabs that were open in this container from the Tab bar.
+   */
   async unhideContainer(cookieStoreId, alreadyShowingUrl) {
     if (!this.unhideQueue.includes(cookieStoreId)) {
       this.unhideQueue.push(cookieStoreId);
@@ -136,7 +187,18 @@ const backgroundLogic = {
     }
   },
 
-  // https://github.com/mozilla/multi-account-containers/issues/847
+  /**
+   * Linked Issue: https://github.com/mozilla/multi-account-containers/issues/847
+   * Status: Fixed
+   * Solution: https://www.ghacks.net/2020/07/12/firefoxs-multi-account-containers-add-on-gets-site-isolation-feature/
+   * 
+   * NOTE: Not 100% sure what the code is exactly doing, but what it should do
+   * is allow you to open sites in a new container than your current one to disallow
+   * tracking for the site in your current container.
+   * 
+   * NOTE: This could be something we could break.
+   * 
+   */
   async addRemoveSiteIsolation(cookieStoreId, remove = false) {
     const containerState = await identityState.storageArea.get(cookieStoreId);
     try {
@@ -151,6 +213,12 @@ const backgroundLogic = {
     }
   },
 
+  /**
+   * Get all the tabs (hidden and not hidden) for a container, and opens them
+   * in a new window. It pins one tab to satisfy some Firefox requirements to
+   * actually move all the tabs. It will also close any tabs that open in the
+   * new window by default but are not part of this container.
+   */
   async moveTabsToWindow(options) {
     const requiredArguments = ["cookieStoreId", "windowId"];
     this.checkArgs(requiredArguments, options, "moveTabsToWindow");
@@ -224,6 +292,16 @@ const backgroundLogic = {
     return rv;
   },
 
+  /**
+   * Get's all tabs that are currently open for this contianer and then automatically
+   * closes them.
+   * 
+   * userContextId == CONTAINER_NAME
+   * cookieStoreId == firefox-container-CONTAINER_NAME
+   * 
+   * MAYBE: if windowId is passed in, that means the user has closed the entire window
+   * so this function is used for both closing windows and closing specific tabs.
+   */
   async _closeTabs(userContextId, windowId = false) {
     const cookieStoreId = this.cookieStoreId(userContextId);
     let tabs;
@@ -242,6 +320,12 @@ const backgroundLogic = {
     return browser.tabs.remove(tabIds);
   },
 
+  /**
+   * Gets all containers. For each container, get metadata about each container
+   * and return it.
+   * 
+   * NOTE: !! converts !!0 to false and !!1 to true
+   */
   async queryIdentitiesState(windowId) {
     const identities = await browser.contextualIdentities.query({});
     const identitiesOutput = {};
@@ -265,6 +349,10 @@ const backgroundLogic = {
     return identitiesOutput;
   },
 
+  /**
+   * Get all windows, then for each window sort all the tabs. Refer to _sortTabsInternal
+   * for sorting mechanism/ordering. It first pinned tabs then sorts unpinned tabs.
+   */
   async sortTabs() {
     const windows = await browser.windows.getAll();
     for (let windowObj of windows) { // eslint-disable-line prefer-const
@@ -274,6 +362,12 @@ const backgroundLogic = {
     }
   },
 
+  /**
+   * Sorts tabs by container/tabs.
+   * 
+   * TODO: Didn't actaully understand the desired ordering, but felt like it was
+   * unimportant for now.
+   */
   async _sortTabsInternal(windowObj, pinnedTabs) {
     const tabs = await browser.tabs.query({windowId: windowObj.id});
     let pos = 0;
@@ -314,6 +408,9 @@ const backgroundLogic = {
     });
   },
 
+  /**
+   * Hide all the tabs for this container in this window.
+   */
   async hideTabs(options) {
     const requiredArguments = ["cookieStoreId", "windowId"];
     this.checkArgs(requiredArguments, options, "hideTabs");
@@ -326,6 +423,9 @@ const backgroundLogic = {
     return containerState;
   },
 
+  /**
+   * Open any hidden tabs that were not already showing for this container.
+   */
   async showTabs(options) {
     if (!("cookieStoreId" in options)) {
       return Promise.reject("showTabs must be called with cookieStoreId argument.");
@@ -356,11 +456,14 @@ const backgroundLogic = {
     return identityState.storageArea.set(options.cookieStoreId, containerState);
   },
 
+  /**
+   * Get cookieStoreId from the userContextId.
+   */
   cookieStoreId(userContextId) {
     if(userContextId === 0) return "firefox-default";
     return `firefox-container-${userContextId}`;
   }
 };
 
-
+// This is immediately executed when Firefox/Multi-Account Containers is started up
 backgroundLogic.init();

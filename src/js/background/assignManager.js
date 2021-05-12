@@ -9,6 +9,11 @@ window.assignManager = {
     area: browser.storage.local,
     exemptedTabs: {},
 
+    /**
+     * Prefix the URL:port with "siteContainerMap@@_".
+     * 
+     * TODO: Why is this done? What is it used for?
+     */
     getSiteStoreKey(pageUrlorUrlKey) {
       if (pageUrlorUrlKey.includes("siteContainerMap@@_")) return pageUrlorUrlKey;
       const url = new window.URL(pageUrlorUrlKey);
@@ -20,6 +25,13 @@ window.assignManager = {
       }
     },
 
+    /**
+     * Labels a tab as exempted.
+     * 
+     * TODO: Where is this used? What is an exempted tab? --> Occurs when you
+     * open the same site in two different containers where that site is only
+     * assigned to one container.
+     */
     setExempted(pageUrlorUrlKey, tabId) {
       const siteStoreKey = this.getSiteStoreKey(pageUrlorUrlKey);
       if (!(siteStoreKey in this.exemptedTabs)) {
@@ -27,12 +39,26 @@ window.assignManager = {
       }
       this.exemptedTabs[siteStoreKey].push(tabId);
     },
-
+    
+    /**
+     * Remove the exempted label for a tab.
+     * 
+     * TODO: Where is this used? What is an exempted tab? --> Occurs when you
+     * open the same site in two different containers where that site is only
+     * assigned to one container.
+     */
     removeExempted(pageUrlorUrlKey) {
       const siteStoreKey = this.getSiteStoreKey(pageUrlorUrlKey);
       this.exemptedTabs[siteStoreKey] = [];
     },
 
+    /**
+     * Checks if a tab is exempted.
+     * 
+     * TODO: Where is this used? What is an exempted tab? --> Occurs when you
+     * open the same site in two different containers where that site is only
+     * assigned to one container.
+     */
     isExempted(pageUrlorUrlKey, tabId) {
       const siteStoreKey = this.getSiteStoreKey(pageUrlorUrlKey);
       if (!(siteStoreKey in this.exemptedTabs)) {
@@ -41,21 +67,39 @@ window.assignManager = {
       return this.exemptedTabs[siteStoreKey].includes(tabId);
     },
 
+    /**
+     * Returns a promise which comes from getByUrlKey. Refer to that function
+     * for return value.
+     */
     get(pageUrlorUrlKey) {
       const siteStoreKey = this.getSiteStoreKey(pageUrlorUrlKey);
       return this.getByUrlKey(siteStoreKey);
     },
 
+    /**
+     * Syncing is used when you use multi-account containers on different machines
+     * and are logged in with the same Firefox account. It will sync container names,
+     * colors, icons, and site assignments between those machines.
+     */
     async getSyncEnabled() {
       const { syncEnabled } = await browser.storage.local.get("syncEnabled");
       return !!syncEnabled;
     },
 
+     /**
+     * TODO: Not sure what this is for, we will look into it once we see it/need it.
+     */
     async getReplaceTabEnabled() {
       const { replaceTabEnabled } = await browser.storage.local.get("replaceTabEnabled");
       return !!replaceTabEnabled;
     },
 
+    /**
+     * Using the prefixed URL (siteStoreKey) find the container that is matched
+     * to this url.
+     * 
+     * TODO: We are not 100% sure if this is correct.
+     */
     getByUrlKey(siteStoreKey) {
       return new Promise((resolve, reject) => {
         this.area.get([siteStoreKey]).then((storageResponse) => {
@@ -69,6 +113,14 @@ window.assignManager = {
       });
     },
 
+    /**
+     * Exempts this page from any tabs that currently have the page open already.
+     * Writes to local storage a KeyValue pair of [siteStoreKey] --> data.
+     * If sync is enabled, it will ensure that this site is undeleted for the
+     * siteStoreKey (in the case it was deleted previously)
+     * 
+     * TL;DR: Setting a website assignment for a container.
+     */
     async set(pageUrlorUrlKey, data, exemptedTabIds, backup = true) {
       const siteStoreKey = this.getSiteStoreKey(pageUrlorUrlKey);
       if (exemptedTabIds) {
@@ -89,6 +141,10 @@ window.assignManager = {
       return;
     },
 
+    /**
+     * Removing a website assignment for a container. If it is exempted, make 
+     * sure to remove it and sync it across profiles.
+     */
     async remove(pageUrlorUrlKey) {
       const siteStoreKey = this.getSiteStoreKey(pageUrlorUrlKey);
       // When we remove an assignment we should clear all the exemptions
@@ -99,11 +155,18 @@ window.assignManager = {
       return;
     },
 
+    /**
+     * Remove the assigned sites from the container that is going to be deleted.
+     */
     async deleteContainer(userContextId) {
       const sitesByContainer = await this.getAssignedSites(userContextId);
       this.area.remove(Object.keys(sitesByContainer));
     },
 
+    /**
+     * Get all the sites that are assigned to this container and remove the
+     * storage prefix to get just URL:port.
+     */
     async getAssignedSites(userContextId = null) {
       const sites = {};
       const siteConfigs = await this.area.get();
@@ -130,6 +193,8 @@ window.assignManager = {
      * Looks for abandoned site assignments. If there is no identity with 
      * the site assignment's userContextId (cookieStoreId), then the assignment
      * is removed.
+     * 
+     * AKA: Clean up local storage for site assignments to removed containers.
      */
     async upgradeData() {
       const identitiesList = await browser.contextualIdentities.query({});
@@ -161,6 +226,12 @@ window.assignManager = {
 
   },
 
+  /**
+   * Given a website, if the user decides to always do an action when opening
+   * the site, ensure that decision is written to the local storage for this page.
+   * That way, the extensions "never asks" the user again about what they want to
+   * do for a new site that opens.
+   */
   _neverAsk(m) {
     const pageUrl = m.pageUrl;
     if (m.neverAsk === true) {
@@ -177,15 +248,22 @@ window.assignManager = {
     }
   },
 
-  // We return here so the confirm page can load the tab when exempted
+  /**
+   * We return here so the confirm page can load the tab when exempted.
+   */
   async _exemptTab(m) {
     const pageUrl = m.pageUrl;
     await this.storageArea.setExempted(pageUrl, m.tabId);
     return true;
   },
 
-  // Before a request is handled by the browser we decide if we should
-  // route through a different container
+  /**
+   * Before a request is handled by the browser we decide if we should route
+   * through a different container. 
+   * 
+   * High-level Example/Description: Open a new Firefox window and search "amazon.com." Check if it is
+   * registered with a container and if so, open it with that container.
+   */
   async onBeforeRequest(options) {
     if (options.frameId !== 0 || options.tabId === -1) {
       return {};
@@ -338,6 +416,11 @@ window.assignManager = {
     };
   },
 
+  /**
+   * Checking if this website needs to be opened in the default container because
+   * the container from which it was accessed is locked and cannot open other
+   * new tabs.
+   */
   async _maybeSiteIsolatedReloadInDefault(siteSettings, tab) {
     // Tab doesn't support cookies, so containers not supported either.
     if (!("cookieStoreId" in tab)) {
@@ -361,6 +444,10 @@ window.assignManager = {
     return currentContainerState && currentContainerState.isIsolated;
   },
 
+  /**
+   * Initialization of listeners to handle requests from the web and decide
+   * which containers to open those requests in.
+   */
   init() {
     browser.contextMenus.onClicked.addListener((info, tab) => {
       info.bookmarkId ? 
@@ -390,6 +477,11 @@ window.assignManager = {
     this.resetBookmarksMenuItem();
   },
 
+  /**
+   * Used to manage bookmarks.
+   * 
+   * NOTE: Bookmarks are an optional permission not enabled by default anyways.
+   */
   async resetBookmarksMenuItem() {
     const hasPermission = await browser.permissions.contains({
       permissions: ["bookmarks"]
