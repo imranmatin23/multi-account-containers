@@ -1,3 +1,12 @@
+/**
+ * Once a user clicks the multi-account containers button in the browser toolbar, 
+ * they will see an option that says "Always Open this Site in...". When they
+ * click that this, method runs to populate the next menu with all of the containers
+ * the user can open the url in.
+ * 
+ * The function just gets all containers, and for each container create an 
+ * HTML element for the user to see.
+ */
 async function init() {
   const fragment = document.createDocumentFragment();
 
@@ -32,4 +41,6 @@ async function init() {
   list.appendChild(fragment);
 }
 
+// Runs whenever you click the multi-account button in the tool bar to get the
+// most update to date list of all containers.
 init();

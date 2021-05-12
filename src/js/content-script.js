@@ -1,14 +1,21 @@
 /**
- * Description: This page runs everytime any url is accessed. However, 
- * 
+ * Description: This page runs everytime any url is accessed. There is no core
+ * logic here, it is just animating the page using the logo whenever there is 
+ * a message sent.
  */
 
+/**
+ * Wait for x amount of delay.
+ */
 async function delayAnimation(delay = 350) {
   return new Promise((resolve) => {
     setTimeout(resolve, delay);
   });
 }
 
+/**
+ * Do the animation on some element.
+ */
 async function doAnimation(element, property, value) {
   return new Promise((resolve) => {
     const handler = () => {
@@ -22,6 +29,10 @@ async function doAnimation(element, property, value) {
   });
 }
 
+/**
+ * Perform the animation whenever a message is sent. At the end of this function,
+ * there have been no state changes.
+ */
 async function addMessage(message) {
   const divElement = document.createElement("div");
   divElement.classList.add("container-notification");
@@ -48,6 +59,7 @@ async function addMessage(message) {
 
 // browser.runtime.onMessage is used to listen for messages from other parts of the extension
 // Example: A content script can listen for messages from a background script using browswer.runtime.onMessage
+// Runs anytime a message is sent to the browser runtime.
 browser.runtime.onMessage.addListener((message) => {
   addMessage(message);
 });

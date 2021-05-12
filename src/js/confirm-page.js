@@ -1,3 +1,8 @@
+/**
+ * Get information about the page and the container name.
+ * Add listeners to "deny" and "confirm" buttons so that when they are clicked,
+ * they perform the correct functions.
+ */
 async function load() {
   const searchParams = new URL(window.location).searchParams;
   const redirectUrl = searchParams.get("url");
@@ -28,6 +33,10 @@ async function load() {
   });
 }
 
+/**
+ * Append the website favicon to the url that your trying to go to. This will
+ * show the favicon with the url on the confirm page.
+ */
 function appendFavicon(pageUrl, redirectUrlElement) {
   const origin = new URL(pageUrl).origin;
   const favIconElement = Utils.createFavIconElement(`${origin}/favicon.ico`);
@@ -35,6 +44,12 @@ function appendFavicon(pageUrl, redirectUrlElement) {
   redirectUrlElement.prepend(favIconElement);
 }
 
+/**
+ * This is run when the user decides to open the site in the container they had
+ * previously assigned the url to. It checks if they user said to remeber their
+ * decision (neverAsk) and sends a message to the browser runtime to update
+ * local storage with this information. Opens the site in the container.
+ */
 function confirmSubmit(redirectUrl, cookieStoreId) {
   const neverAsk = document.getElementById("never-ask").checked;
   // Sending neverAsk message to background to store for next time we see this process
@@ -48,6 +63,9 @@ function confirmSubmit(redirectUrl, cookieStoreId) {
   openInContainer(redirectUrl, cookieStoreId);
 }
 
+/**
+ * Return the tab that is active right now.
+ */
 function getCurrentTab() {
   return browser.tabs.query({
     active: true,
@@ -55,6 +73,14 @@ function getCurrentTab() {
   });
 }
 
+/**
+ * This is run when the user decides to open the site in the current container and tab.
+ * It will send a message to open this site, but it only remembers to do this in this
+ * tab. If the user were to repeat this process in a new tab, they would arrive confirm page.
+ * 
+ * The "Remeber my decision for this site" does not do anything if the user decides
+ * to open the site in the current container.
+ */
 async function denySubmit(redirectUrl) {
   const tab = await getCurrentTab();
   await browser.runtime.sendMessage({
@@ -65,8 +91,12 @@ async function denySubmit(redirectUrl) {
   document.location.replace(redirectUrl);
 }
 
+// Registers event handlers and favicon set up for the confirm page
 load();
 
+/**
+ * Creates a new tab in the desired container with the url and removes the old tab.
+ */
 async function openInContainer(redirectUrl, cookieStoreId) {
   const tab = await getCurrentTab();
   await browser.tabs.create({

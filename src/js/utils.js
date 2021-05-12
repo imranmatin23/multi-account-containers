@@ -3,6 +3,9 @@ const DEFAULT_FAVICON = "/img/blank-favicon.svg";
 // TODO use export here instead of globals
 const Utils = {
 
+  /**
+   * Creates a favicon element and returns it.
+   */
   createFavIconElement(url) {
     const imageElement = document.createElement("img");
     imageElement.classList.add("icon", "offpage", "menu-icon");
@@ -55,6 +58,9 @@ const Utils = {
     return result.join("");
   },
 
+  /**
+   * Gets the current tab.
+   */
   async currentTab() {
     const activeTabs = await browser.tabs.query({ active: true, windowId: browser.windows.WINDOW_ID_CURRENT });
     if (activeTabs.length > 0) {
@@ -63,6 +69,9 @@ const Utils = {
     return false;
   },
   
+  /**
+   * Set listeners for when you click or press enter
+   */
   addEnterHandler(element, handler) {
     element.addEventListener("click", (e) => {
       handler(e);
@@ -75,6 +84,9 @@ const Utils = {
     });
   },
 
+  /**
+   * Set listener for only when you press enter.
+   */
   addEnterOnlyHandler(element, handler) {
     element.addEventListener("keydown", (e) => {
       if (e.keyCode === 13) {
@@ -84,11 +96,18 @@ const Utils = {
     });
   },  
 
+  /**
+   * Gets the userContextId from the cookieStoreId.
+   */
   userContextId(cookieStoreId = "") {
     const userContextId = cookieStoreId.replace("firefox-container-", "");
     return (userContextId !== cookieStoreId) ? Number(userContextId) : false;
   },
 
+  /**
+   * Send a set or remove message to messagehandler.js to either set or remove
+   * and assignment of a url to a container.
+   */
   setOrRemoveAssignment(tabId, url, userContextId, value) {
     return browser.runtime.sendMessage({
       method: "setOrRemoveAssignment",
@@ -99,6 +118,9 @@ const Utils = {
     });
   },
 
+  /**
+   * Sends a message to messagehandler.js to reload a url in a specific container.
+   */
   async reloadInContainer(url, currentUserContextId, newUserContextId, tabIndex, active) {
     return await browser.runtime.sendMessage({
       method: "reloadInContainer",
@@ -110,6 +132,11 @@ const Utils = {
     });
   },
 
+  /**
+   * If the currentTab's url isn't already loaded into the right container, then
+   * assign it and reload the page in the right container. Else if it is, then
+   * just assign the url to that container.
+   */
   async alwaysOpenInContainer(identity) {
     const currentTab = await this.currentTab();
     const assignedUserContextId = this.userContextId(identity.cookieStoreId);
@@ -133,5 +160,5 @@ const Utils = {
 
 };
 
-
+// asign Utils object for this window.
 window.Utils = Utils;
