@@ -86,9 +86,9 @@ window.assignManager = {
       return !!syncEnabled;
     },
 
-     /**
-     * TODO: Not sure what this is for, we will look into it once we see it/need it.
-     */
+    /**
+    * TODO: Not sure what this is for, we will look into it once we see it/need it.
+    */
     async getReplaceTabEnabled() {
       const { replaceTabEnabled } = await browser.storage.local.get("replaceTabEnabled");
       return !!replaceTabEnabled;
