@@ -3,11 +3,21 @@ window.identityState = {
   storageArea: {
     area: browser.storage.local,
 
+    /**
+     * Get the containerStoreKey using the cookieStoreId by prefixing it with
+     * how it is stored in browser storage.
+     */
     getContainerStoreKey(cookieStoreId) {
       const storagePrefix = "identitiesState@@_";
       return `${storagePrefix}${cookieStoreId}`;
     },
 
+    /**
+     * Get's the containerState from the storage. The first if is handling
+     * when the container is stored in storage without a UUID, and if so it just
+     * adds that first. If not that case, then confirm that this container is
+     * in use and return the default container state for this container.
+     */
     async get(cookieStoreId) {
       const storeKey = this.getContainerStoreKey(cookieStoreId);
       const storageResponse = await this.area.get([storeKey]);
@@ -31,6 +41,9 @@ window.identityState = {
       return false;
     },
 
+    /**
+     * Save the containerState for a container into the browser storage.
+     */
     set(cookieStoreId, data) {
       const storeKey = this.getContainerStoreKey(cookieStoreId);
       return this.area.set({
@@ -38,16 +51,27 @@ window.identityState = {
       });
     },
 
+    /**
+     * Remove the containerState for a container into the browser storage.
+     */
     async remove(cookieStoreId) {
       const storeKey = this.getContainerStoreKey(cookieStoreId);
       return this.area.remove([storeKey]);
     },
 
+    /**
+     * Set a keyboard shortcut to map to a certain container. Save this information
+     * into the browswer local storage.
+     */
     async setKeyboardShortcut(shortcutId, cookieStoreId) {
       identityState.keyboardShortcut[shortcutId] = cookieStoreId;
       return this.area.set({[shortcutId]: cookieStoreId});
     },
 
+    /**
+     * Get all of the keyboard shortcuts (and which container they map to if they
+     * have one) from browswer storage and return them
+     */
     async loadKeyboardShortcuts () {
       const identities = await browser.contextualIdentities.query({});
       for (let i=0; i < backgroundLogic.NUMBER_OF_KEYBOARD_SHORTCUTS; i++) {
@@ -70,6 +94,11 @@ window.identityState = {
      * Looks for abandoned identity keys in local storage, and makes sure all
      * identities registered in the browser are also in local storage. (this
      * appears to not always be the case based on how this.get() is written)
+     * 
+     * Ensure that all containers have a UUID for them in storage. Ensure that
+     * any containers that are the default container, if they were not found in
+     * storage and in the the current browser then it is a stale container and
+     * remove it. 
      */
     async upgradeData() {
       const identitiesList = await browser.contextualIdentities.query({});
@@ -100,10 +129,17 @@ window.identityState = {
 
   },
 
+  /**
+   * Wrapper to create a tab object.
+   */
   _createTabObject(tab) {
     return Object.assign({}, tab);
   },
 
+  /**
+   * For each contextualIdentity in the browser, get a map of cookieStoreId to
+   * UUID.
+   */
   async getCookieStoreIDuuidMap() {
     const containers = {};
     const identities = await browser.contextualIdentities.query({});
@@ -114,6 +150,10 @@ window.identityState = {
     return containers;
   },
 
+  /**
+   * Update the storage with the new container state because we have now hidden
+   * some tabs for this container.
+   */
   async storeHidden(cookieStoreId, windowId) {
     const containerState = await this.storageArea.get(cookieStoreId);
     const tabsByContainer = await browser.tabs.query({cookieStoreId, windowId});
@@ -132,6 +172,9 @@ window.identityState = {
     return this.storageArea.set(cookieStoreId, containerState);
   },
 
+  /**
+   * Update the UUID in storage for a container.
+   */
   async updateUUID(cookieStoreId, uuid) {
     if (!cookieStoreId || !uuid) {
       throw new Error ("cookieStoreId or uuid missing");
@@ -142,10 +185,17 @@ window.identityState = {
     return uuid;
   },
 
+  /**
+   * If this cookieStoreId is missing a UUID in storage, calling get will create
+   * a UUID for it.
+   */
   async addUUID(cookieStoreId) {
     await this.storageArea.get(cookieStoreId);
   },
 
+  /**
+   * Get the macAddonUUId for the container specified from storage.
+   */
   async lookupMACaddonUUID(cookieStoreId) {
     // This stays a lookup, because if the cookieStoreId doesn't 
     // exist, this.get() will create it, which is not what we want.
@@ -160,6 +210,9 @@ window.identityState = {
     return false;
   },
 
+  /**
+   * Get the cookieStoreId for the macAddonUID specified from storage.
+   */
   async lookupCookieStoreId(macAddonUUID) {
     const macConfigs = await this.storageArea.area.get();
     for(const configKey of Object.keys(macConfigs)) {
@@ -172,6 +225,9 @@ window.identityState = {
     return false;
   },
 
+  /**
+   * Creates a new identity state that is used for a container.
+   */
   _createIdentityState() {
     return {
       hiddenTabs: [],
@@ -179,13 +235,21 @@ window.identityState = {
     };
   },
 
+  /**
+   * Calls loadKeyboardShortcuts which loads all keyboard shortcut to container
+   * mappings.
+   */
   init() {
     this.storageArea.loadKeyboardShortcuts();
   }
 };
 
+// Calls init to load keyboardShortcuts.
 identityState.init();
 
+/**
+ * Computes a UUID.
+ */
 function uuidv4() {
   // https://stackoverflow.com/questions/105034/create-guid-uuid-in-javascript
   return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>

@@ -509,6 +509,11 @@ window.assignManager = {
     }
   },
 
+  /**
+   * Creates a new contextual identity in the browser that is used to identify
+   * a container. Uses the information from changeInfo to populate container
+   * state.
+   */
   contextualIdentityCreated(changeInfo) {
     browser.contextMenus.create({
       parentId: assignManager.OPEN_IN_CONTAINER,
@@ -520,6 +525,9 @@ window.assignManager = {
     });
   },
 
+  /**
+   * Update the contextualIdentity associated with a container.
+   */
   contextualIdentityUpdated(changeInfo) {
     browser.contextMenus.update(
       changeInfo.contextualIdentity.cookieStoreId, {
@@ -529,12 +537,19 @@ window.assignManager = {
       });
   },
 
+  /**
+   * Remove the contextualIdentity associated with a container.
+   */
   contextualIdentityRemoved(changeInfo) {
     browser.contextMenus.remove(
       changeInfo.contextualIdentity.cookieStoreId
     );
   },
 
+  /**
+   * This is the logic for handling when the menu for Multi-Account Containers
+   * in the toolbar is clicked.
+   */
   async _onClickedHandler(info, tab) {
     const userContextId = this.getUserContextIdFromCookieStore(tab);
     // Mapping ${URL(info.pageUrl).hostname} to ${userContextId}
@@ -568,6 +583,10 @@ window.assignManager = {
     }
   },
 
+  /**
+   * This is the logic for handling when the a bookmark for Multi-Account Containers
+   * in the toolbar is clicked.
+   */
   async _onClickedBookmark(info) {
 
     async function _getBookmarksFromInfo(info) {
@@ -604,10 +623,17 @@ window.assignManager = {
   },
 
 
+  /**
+   * Wrapper to call the storageArea deleteContainer() method that will delete
+   * a container.
+   */
   deleteContainer(userContextId) {
     this.storageArea.deleteContainer(userContextId);
   },
 
+  /**
+   * Get the userContextId from a cookieStoreId.
+   */
   getUserContextIdFromCookieStore(tab) {
     if (!("cookieStoreId" in tab)) {
       return false;
@@ -617,6 +643,10 @@ window.assignManager = {
     );
   },
 
+  /**
+   * Checks to ensure the url is not an invalid/unable to assingn url that
+   * cannot be assigned to a container.
+   */
   isTabPermittedAssign(tab) {
     // Ensure we are not an important about url
     const url = new URL(tab.url);
@@ -627,6 +657,10 @@ window.assignManager = {
     return true;
   },
 
+  /**
+   * Wrapper for setting or removing website assignments to containers. Called
+   * by _onClickedHandler().
+   */
   async _setOrRemoveAssignment(tabId, pageUrl, userContextId, remove) {
     let actionName;
     // https://github.com/mozilla/testpilot-containers/issues/626
@@ -677,6 +711,11 @@ window.assignManager = {
     }
   },
 
+  /**
+   * If we removed a url that caused a container to be isolated, then can now
+   * make the container not isolated anymore because that site is no longer
+   * assigned to the container.
+   */
   async _maybeRemoveSiteIsolation(userContextId) {
     const assignments = await this.storageArea.getByContainer(userContextId);
     const hasAssignments = assignments && Object.keys(assignments).length > 0;
@@ -689,6 +728,10 @@ window.assignManager = {
     );
   },
 
+  /**
+   * Wrapper: If this tab is able to be assigned, then go get the container that the tab
+   * was assigned to.
+   */
   async _getAssignment(tab) {
     const cookieStore = this.getUserContextIdFromCookieStore(tab);
     // Ensure we have a cookieStore to assign to
@@ -699,10 +742,17 @@ window.assignManager = {
     return false;
   },
 
+  /**
+   * Wrapper to get all the assigned sites for a container
+   */
   _getByContainer(userContextId) {
     return this.storageArea.getAssignedSites(userContextId);
   },
 
+  /**
+   * Removing the actions that are permitted to do on a container. The contextMenu
+   * is shown when you click on a container from the Multi-Account Containers menu.
+   */
   removeContextMenu() {
     // There is a focus issue in this menu where if you change window with a context menu click
     // you get the wrong menu display because of async
@@ -716,6 +766,10 @@ window.assignManager = {
     browser.contextMenus.remove(this.MENU_MOVE_ID);
   },
 
+  /**
+   * Recreate the contextMenu for a container by first removing it then 
+   * recreating it.
+   */
   async calculateContextMenu(tab) {
     this.removeContextMenu();
     const siteSettings = await this._getAssignment(tab);
@@ -759,6 +813,9 @@ window.assignManager = {
     });
   },
 
+  /**
+   * Encode a URL.
+   */
   encodeURLProperty(url) {
     return encodeURIComponent(url).replace(/[!'()*]/g, (c) => {
       const charCode = c.charCodeAt(0).toString(16);
@@ -766,6 +823,9 @@ window.assignManager = {
     });
   },
 
+  /**
+   * Reloads a page into the Firefox default container.
+   */
   reloadPageInDefaultContainer(url, index, active, openerTabId) {
     // To create a new tab in the default container, it is easiest just to omit the
     // cookieStoreId entirely.
@@ -788,6 +848,11 @@ window.assignManager = {
     browser.tabs.create({url, cookieStoreId, index, active, openerTabId});
   },
 
+  /**
+   * Opens a page in a container. If the user has already specified to always
+   * open this page in a container, then do it. Else, prompt the user and 
+   * see if they want to open it in this container or not in the load page.
+   */
   reloadPageInContainer(url, currentUserContextId, userContextId, index, active, neverAsk = false, openerTabId = null) {
     const cookieStoreId = backgroundLogic.cookieStoreId(userContextId);
     const loadPage = browser.extension.getURL("confirm-page.html");
@@ -817,6 +882,9 @@ window.assignManager = {
     }
   },
 
+  /**
+   * Creates the bookmarks menu.
+   */
   async initBookmarksMenu() {
     browser.contextMenus.create({
       id: this.OPEN_IN_CONTAINER,
@@ -835,6 +903,9 @@ window.assignManager = {
     }
   },
 
+  /**
+   * Removes the bookmarks menu.
+   */
   async removeBookmarksMenu() {
     browser.contextMenus.remove(this.OPEN_IN_CONTAINER);
     const identities = await browser.contextualIdentities.query({});
@@ -844,4 +915,6 @@ window.assignManager = {
   },
 };
 
+// Runs so that whenever a contextMenu is clicked, the registered handlers
+// will run to handle it.
 assignManager.init();
